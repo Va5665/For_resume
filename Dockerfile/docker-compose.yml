@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+
+   compile-protos:
+      build:
+         context: .
+         dockerfile: ./docker/locust/Dockerfile
+      volumes:
+         - ./src:/src
+      entrypoint: >
+          sh -c "
+            python3 -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. ./protos/mobile-api/v1/*.proto
+            "
+      working_dir: /src
+      # entrypoint: >
+      #     sh -c "
+      #       python3 -m grpc_tools.protoc -I/src/protos/admin-api/v1/ -I/src/protos/ --python_out=/src/grpc_compiled --grpc_python_out=/src/grpc_compiled /src/protos/admin-api/v1/*.proto &&
+      #       python3 -m grpc_tools.protoc -I/src/protos/mobile-api/v1/ -I/src/protos/ --python_out=/src/grpc_compiled --grpc_python_out=/src/grpc_compiled /src/protos/mobile-api/v1/*.proto &&
+      #       python3 -m grpc_tools.protoc -I/src/protos/vendor-api/v1/ -I/src/protos/ --python_out=/src/grpc_compiled --grpc_python_out=/src/grpc_compiled /src/protos/vendor-api/v1/*.proto
+      #       "
+      # entrypoint: >
+      #     sh -c "
+      #       python3 -m grpc_tools.protoc -I/protos/admin-api/v1/ -I/protos/ --python_out=/admin_api --grpc_python_out=/admin_api /protos/admin-api/v1/*.proto &&
+      #       python3 -m grpc_tools.protoc -I/protos/mobile-api/v1/ -I/protos/ --python_out=/mobile_api --grpc_python_out=/mobile_api /protos/mobile-api/v1/*.proto &&
+      #       python3 -m grpc_tools.protoc -I/protos/vendor-api/v1/ -I/protos/ --python_out=/vendor_api --grpc_python_out=/vendor_api /protos/vendor-api/v1/*.proto &&
+      #       python3 -m grpc_tools.protoc -I/protos/google/api/ -I/protos/ --python_out=/google/api --grpc_python_out=/google/api /protos/google/api/annotations.proto
+      #       "
+
+   headless-runner:
+      build:
+         context: .
+         dockerfile: ./docker/locust/Dockerfile
+      environment:
+         - URL=xxxxxxxxxxxxxxxxx
+         - IS_SECURE_CHANNEL=True
+         - GRPC_DNS_RESOLVER=native
+      extra_hosts:
+         - testhost:host-gateway
+      volumes:
+        - ./src:/src
+        - ./docker/images:/images
+      entrypoint: locust
+      command: [ "pytest", "/Utilities.LoadTests/src/test_assign_employee_to_unit.py" ]
+
+
+      working_dir: /src
+
+   headless-runner-mqtt:
+     build:
+       context: .
+       dockerfile: ./docker/locust/Dockerfile
+     environment:
+       - MQTT_BROKER_URL=wss://mqtt.umecdev.deviot.cloud/broker
+
+     volumes:
+       - ./src:/src
+       - ./docker/images:/images  # Если вы используете изображения в тестах
+     entrypoint: locust
+     command: "-f /src/mqtt_locust_test.py --headless -u 2000 -r 100 --run-time 20s"
+     working_dir: /src
+
+
+  # master:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   ports:
+  #    - "8089:8089"
+  #   volumes:
+  #     - ./:/mnt/locust
+  #   command: -f /mnt/locust/index.py --master -H http://master:8089
+
+  # worker:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   volumes:
+  #     - ./:/mnt/locust
+  #   command: -f /mnt/locust/index.py --worker --master-host master
